@@ -1,0 +1,444 @@
+py3.83
+
+django 3.1.6
+
+
+django-admin startproject mysite
+
+
+cd mysite
+python manage.py runserver
+http://127.0.0.1:8000/
+
+ctrl+c
+
+
+settings.py
+
+DATABASES = { がSQlite3になっている。postgreやmysqlにしないと、大変に負荷に弱いアプリになる。
+
+
+
+LANGUAGE_CODE = 'en-us'
+をコメントアウト
+'ja'
+にしてやる
+
+TIME_ZONE = 'UTC'
+ユニバーサルタイムでなく、Asia/Tokyoにする
+
+
+
+
+python manage.py migrate
+
+
+
+
+
+
+
+
+
+
+アプリpollsの作成
+
+python manage.py startapp polls
+
+
+pollsフォルダが作成されているはず。
+
+
+
+さっきのsettingsのINSTALLED_APPSに
+polls.apps.PollsConfig
+
+を追加
+
+これでプロジェクトからアプリを呼び出せるようになった。
+
+
+pollsのなかのviews.pyにHTMLで表示したい内容を記述する。
+本来ならば直接書かず、外部にテンプレートとして分割して所持しておいたほうがいい。
+
+
+from django.http import HttpResponse
+
+def index(request):
+    return HttpResponse("Hellow")
+
+
+
+これを描くことで、views.index　という名前の関数としてアプリから呼び出せる。
+
+
+https://docs.djangoproject.com/ja/3.1/intro/tutorial01/
+
+
+
+
+
+
+
+
+
+
+pollsのHTTPが確認できたら、テンプレートを作って読み込む方法を知る。
+
+polls
+のフォルダの中に、polls/templates/polls　となるようにフォルダを作る
+
+index.htmlをつｙくり
+
+
+viewsをかきかえる
+
+def index(request):
+    # return HttpResponse("Hello, world. You're at the polls index.")
+
+    return render(request, 'polls/index.html')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+本来ブログをつくるならば、記事はデータベースの中に格納しておく。
+そこで、マイグレーション操作を通して、新たにデータベースを建てる
+
+
+
+pollsのmodelsを編集する
+
+
+
+
+from django.db import models
+
+
+class Question(models.Model):
+    question_text = models.CharField(max_length=200)
+    pub_date = models.DateTimeField('date published')
+
+    imege = models.ImageField(upload_to = 'media/')
+    # mediaという場所に画像をアップロードするという指定
+    body = models.TextField()
+    # ブログ文書をかけるようにtextを入れる場所を作っておく
+    # この文章たちが定義そのものとなり、makemigrateによって自動的に読み込まれ、整合性が取れるようにpipからパッケージを探してくれる。
+
+
+class Choice(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+    choice_text = models.CharField(max_length=200)
+    votes = models.IntegerField(default=0)
+
+
+
+
+
+
+python manage.py makemigrations
+
+
+
+これによってinitial.pyが作成されているはず。
+このファイルを確認すると、マイグレート対象の内容が記述される
+改めてmigrateコマンドを打つことで、整合性のとれた状態に更新される。
+
+このようにして、modelで定義、makemigrationで準備して、migrateで建てる
+
+
+python manage.py migrate
+
+
+
+db.sqlite3
+が今のところ格納されるデータベースファイル
+ひらいてみる
+
+sqlite3 db.sqlite3
+をコマンドプロンプトでうつ
+
+
+.tables
+select * from polls_question
+
+
+いまは空のはず。
+ここにデータを投入するadminを定義していく
+つまり、ブラウザからデータベースへの通信をするわけである
+
+
+
+
+
+
+
+http://127.0.0.1:8000/admin
+
+にアクセス。
+いまはID passは設定されていない。
+
+サーバーを落として、
+
+python manage.py createsuperuser
+python manage.py createsuperuser
+
+ID,passを入力
+Username: admin
+Email address: admin@example.com
+
+Password: A12345678
+Password (again): A12345678
+Superuser created successfully.
+
+
+
+
+
+python manage.py runserver
+
+
+
+
+Bypass password validation and create user anyway?
+
+
+
+
+
+
+
+
+adminを編集
+クラスを追加し、サイト管理から見られるようになる
+ここで、先ほどmodelsで定義した画像やテキストフィールドなどが存在していることを確認できる。
+
+from django.contrib import admin
+
+from .models import Question
+
+admin.site.register(Question)
+
+
+
+
+適当に入力してみる。
+
+
+Question object (2)
+
+とかの名前になるので、これは、modelsのクラスを編集して、selfにタイトルであるquestion_textを返すようにする
+
+
+
+
+
+
+折角なので、投稿した記事をtopページに表示させる
+
+
+
+
+
+
+
+
+ビューを
+
+
+from django.shortcuts import render
+
+# Create your views here.
+
+
+from django.http import HttpResponse
+
+#定義したクラスを読み込む
+from .models import Question
+
+
+
+def index(request):
+    # return HttpResponse("Hello, world. You're at the polls index.")
+    ques = Question.objects.order_by('-pub_date')
+
+    return render(request, 'polls/index.html', {'poll':ques})
+
+
+
+
+
+
+
+
+
+
+
+
+インデックスファイルを
+
+
+<!DOCTYPE html>
+<html lang = "ja-jp">
+    <head>
+        <title>投稿</title>
+    </head>
+    <body>
+        <h1>ようこそ</h1>
+
+        <h2>さいしん</h2>
+
+        {% for po in poll.all %}
+
+          {{ po.question_text }}
+
+        {% endfor %}
+
+
+    </body>
+</html>
+
+
+
+
+真ん中に入っているのはtemplateエンジンの特有の文法
+
+
+
+
+
+まだリンクされてなかったり、改行されていないので、これはデザインを変えることで実行していく。
+
+
+
+まず、改行や画像タグを使う
+
+
+
+
+<!DOCTYPE html>
+<html lang = "ja-jp">
+    <head>
+        <title>投稿</title>
+    </head>
+    <body>
+        <h1>ようこそ</h1>
+
+        <h2>さいしん</h2>
+
+        {% for po in poll.all %}
+
+        {{ po.question_text }}
+    <br /><br />
+    {{ po.pub_date }}
+
+    <br /><br />
+    <img src = '{{ po.imege.url }}' />
+    {{ po.summary }}
+    <br /><br />
+
+        {% endfor %}
+
+
+    </body>
+</html>
+
+
+
+このままだとまだ画像ファイルと結び付いていないのでsettingsとmysiteのurlsをいじる
+
+
+URLS
+
+
+from django.contrib import admin
+from django.urls import include, path
+
+from django.conf.urls.static import static
+from django.conf import settings
+
+
+
+urlpatterns = [
+    path('polls/', include('polls.urls')),
+    path('admin/', admin.site.urls),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+#静的ファイルの置き場を指定する
+#指定元はsettingsに明示してあるものを使う
+
+
+
+
+settings
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/3.1/howto/static-files/
+
+STATIC_URL = '/static/'
+MEDIA_URL = '/pics/'
+MEDIA_ROOT = BASE_DIR
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+投稿したもの別URLに分けたい。
+urlを設定しよう。
+
+いままでは
+mysite urls →　polls urls → views index　で繋がっていた。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
